@@ -18,6 +18,7 @@ int main()
 	//cout << sum / 15 << endl;
 
 
+	// test!!!!!!!!!!!!!!
 	//int M = 30000;
 	//SpMat A(M, M);
 	//SpMat AtA(M, M);

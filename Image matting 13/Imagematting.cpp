@@ -157,11 +157,8 @@ void Imagematting::findKnearest()// build 2 KD-trees
 
 	FileStorage fs("Kdata2.xml", FileStorage::WRITE); // save the data
 	fs << "bindices" << bresult.indices;
-//	fs << "bdists" << bresult.dists;
 	fs << "findices" << fresult.indices;
-//	fs << "fdists" << fresult.dists;
 	fs << "w3indices" << w3result.indices;
-//	fs << "w3dists" << w3result.dists;
 	fs.release();
 
 	cout << "get kdtree ok " << endl;
@@ -577,6 +574,7 @@ void   Imagematting::getFinalAlpha()
 	// (I + T(L) * L) * alpha = I * G
 	SpMat A = I + (L.transpose() * L);
 
+	// save data in A.txt
 	fstream f("A.txt", ios::out);
 	for (int k = 0; k < A.outerSize(); ++k)
 	{
@@ -589,7 +587,7 @@ void   Imagematting::getFinalAlpha()
 	
 	VectorXd b = I * G;
 	SpMat AtA(N, N);
-	AtA = A.transpose() * A;
+	AtA = A.transpose() * A; // here are some errors
 	VectorXd AtB = A.transpose() * b;
 
 	clock_t start, finish;
@@ -636,11 +634,8 @@ void   Imagematting::solveAlpha()
 	// read four mats in "Kdata.xml"
 	FileStorage fs("Kdata2.xml", FileStorage::READ);
 	fs["findices"] >> fresult.indices;
-//	fs["fdists"] >> fresult.dists;
 	fs["bindices"] >> bresult.indices;
-//	fs["bdists"] >> bresult.dists;
 	fs["w3indices"] >> w3result.indices;
-//	fs["w3dists"] >> w3result.dists;
 	fs.release();
 
 //	getPreAlpha(); // get predicted alpha of every pixel
