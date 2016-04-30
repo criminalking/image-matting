@@ -5,8 +5,8 @@ Imagematting::Imagematting()
 	bsize = 0;
 	fsize = 0;
 	usize = 0;
-	covarienceOfMat = cvCreateMat(3, 3, CV_64FC1); // N * N (channel * channel) 
-	avgOfMat = cvCreateMat(1, 3, CV_64FC1); // 1 * N (1 * channel)
+	covarienceOfMat = cvCreateMat(3, 3, CV_64FC1); // n * n (channel * channel) 
+	avgOfMat = cvCreateMat(1, 3, CV_64FC1); // 1 * n (1 * channel)
 }
 
 Imagematting::~Imagematting()
@@ -20,7 +20,7 @@ Imagematting::~Imagematting()
 
 void Imagematting::loadImage(char * filename)
 {
-	img = cvLoadImage(filename);
+	img = cvLoadImage(filename, -1);
 	if (!img)
 	{
 		cout << "Loading Image Failed!" << endl;
@@ -52,7 +52,8 @@ void Imagematting::loadImage(char * filename)
 
 void Imagematting::loadTrimap(char * filename)
 {
-	trimap = cvLoadImage(filename);
+	trimap = cvLoadImage(filename, -1);
+	g_step = trimap->widthStep;
 	if (!trimap)
 	{
 		cout << "Loading Trimap Failed!" << endl;
@@ -60,19 +61,18 @@ void Imagematting::loadTrimap(char * filename)
 	}
 	//get uszie, bsiez, fsize
 	uchar *udata = (uchar *)trimap->imageData;
-	int n = trimap->imageSize;
 	for (int i = 0; i < height; i++)
 	{
 		for (int j = 0; j < width; j++)
 		{
-			int gray = udata[i * step + j]; 
-			if (gray == 0) // c is a background     ////////////////////可以修改使用mat的push_back！！！！！
+			int gray = udata[i * g_step + j];
+			if (gray < 5) // c is a background     ////////////////////可以修改使用mat的push_back！！！！！
 			{
 				bsize++;
 				tri[i][j] = 0;
 				preAlpha[i][j] = 0;
 			}
-			else if (gray == 255) // c is a foreground
+			else if (gray > 250) // c is a foreground
 			{
 				fsize++;
 				tri[i][j] = 1;
@@ -105,6 +105,7 @@ void Imagematting::addInMat(Mat &mat, int n, int i, int j, int b, int g, int r)
 void Imagematting::createMat()
 {
 	uchar *udata = (uchar *)trimap->imageData;
+
 	int bn = 0, fn = 0, un = 0, n = 0;
 
 	for (int i = 0; i < height; i++)
@@ -114,8 +115,8 @@ void Imagematting::createMat()
 			int bc = data[i * step + j * channels];
 			int gc = data[i * step + j * channels + 1];
 			int rc = data[i * step + j * channels + 2];
-			int gray = udata[i * step + j];
-			if (gray == 0) // gray is background (gray == 4!!!!!!!!!!!!!!)
+			int gray = udata[i * g_step + j];
+			if (gray < 5) // gray is background (gray == 4!!!!!!!!!!!!!!)
 			{
 				// add (x,y,r,g,b) to bmat
 				addInMat(bmat, bn, i, j, bc, gc, rc);
@@ -123,7 +124,7 @@ void Imagematting::createMat()
 				bn++;
 				n++;
 			}
-			else if (gray == 255) // gray is foreground (gray == 252!!!!!!!!!!)
+			else if (gray > 250) // gray is foreground (gray == 252!!!!!!!!!!)
 			{
 				// add (x,y,r,g,b) to fmat
 				addInMat(fmat, fn, i, j, bc, gc, rc);
@@ -146,7 +147,7 @@ void Imagematting::createMat()
 
 void Imagematting::findKnearest()// build 2 KD-trees
 {
-	flann::Index tree1(bmat, flann::KDTreeIndexParams(4), cvflann::FLANN_DIST_EUCLIDEAN);// create kd-tree for background
+	flann::Index tree1(bmat, flann::KDTreeIndexParams(4));// create kd-tree for background
 	tree1.knnSearch(umat, bresult.indices, bresult.dists, K); // search kd-tree
 
 	flann::Index tree2(fmat, flann::KDTreeIndexParams(4));// create kd-tree for foreground
@@ -155,11 +156,11 @@ void Imagematting::findKnearest()// build 2 KD-trees
 	flann::Index tree3(allmat, flann::KDTreeIndexParams(4));// create kd-tree for all pixels
 	tree3.knnSearch(allmat, w3result.indices, w3result.dists, K); // search kd-tree
 
-	FileStorage fs("Kdata2.xml", FileStorage::WRITE); // save the data
-	fs << "bindices" << bresult.indices;
-	fs << "findices" << fresult.indices;
-	fs << "w3indices" << w3result.indices;
-	fs.release();
+	//FileStorage fs("K2.xml", FileStorage::WRITE); // save the data
+	//fs << "bindices" << bresult.indices;
+	//fs << "findices" << fresult.indices;
+	//fs << "w3indices" << w3result.indices;
+	//fs.release();
 
 	cout << "get kdtree ok " << endl;
 }
@@ -191,7 +192,7 @@ double Imagematting::getRd(int c, int f, int b) //f is the fth-nearest pixel of 
 		(((fmat.at<int>(findex, 2) - bmat.at<int>(bindex, 2)) * (fmat.at<int>(findex, 2) - bmat.at<int>(bindex, 2)) +
 		(fmat.at<int>(findex, 3) - bmat.at<int>(bindex, 3)) * (fmat.at<int>(findex, 3) - bmat.at<int>(bindex, 3)) +
 		(fmat.at<int>(findex, 4) - bmat.at<int>(bindex, 4)) * (fmat.at<int>(findex, 4) - bmat.at<int>(bindex, 4))) + 0.0000001));
-	//return result / 255.0;  ?????????????????????
+//	return result / 255.0;  //?????????????????????
 	return result;
 }
 
@@ -205,12 +206,12 @@ void Imagematting::getD() // correspond to umat
 		// calculate d2
 		int bindex = bresult.indices.at<int>(i, 0); // get the nearest background of C
 		dB[i] = 0;
-		for (int j = 0; j < 5; j++)
+		for (int j = 2; j < 5; j++)
 			dB[i] += (umat.at<int>(i, j) - bmat.at<int>(bindex, j)) * (umat.at<int>(i, j) - bmat.at<int>(bindex, j));
 
 		int findex = fresult.indices.at<int>(i, 0); // get the nearest foreground of C
 		dF[i] = 0;
-		for (int j = 0; j < 5; j++)
+		for (int j = 2; j < 5; j++)
 			dF[i] += (umat.at<int>(i, j) - fmat.at<int>(findex, j)) * (umat.at<int>(i, j) - fmat.at<int>(findex, j));
 	}
 	cout << "getD ok " << endl;
@@ -225,14 +226,14 @@ double Imagematting::getW(int c, int fb, bool flag) // flag == 1, f; flag == 0, 
 		int index = bresult.indices.at<int>(c, fb);
 		w = exp(-((umat.at<int>(c, 2) - bmat.at<int>(index, 2)) * (umat.at<int>(c, 2) - bmat.at<int>(index, 2)) +
 			(umat.at<int>(c, 3) - bmat.at<int>(index, 3)) * (umat.at<int>(c, 3) - bmat.at<int>(index, 3)) +
-			(umat.at<int>(c, 4) - bmat.at<int>(index, 4)) * (umat.at<int>(c, 4) - bmat.at<int>(index, 4))) / dB[c]);
+			(umat.at<int>(c, 4) - bmat.at<int>(index, 4)) * (umat.at<int>(c, 4) - bmat.at<int>(index, 4))) / (dB[c] + 0.0000001));
 	}
 	else // f
 	{
 		int index = fresult.indices.at<int>(c, fb);
 		w = exp(-((umat.at<int>(c, 2) - fmat.at<int>(index, 2)) * (umat.at<int>(c, 2) - fmat.at<int>(index, 2)) +
 			(umat.at<int>(c, 3) - fmat.at<int>(index, 3)) * (umat.at<int>(c, 3) - fmat.at<int>(index, 3)) +
-			(umat.at<int>(c, 4) - fmat.at<int>(index, 4)) * (umat.at<int>(c, 4) - fmat.at<int>(index, 4))) / dF[c]);
+			(umat.at<int>(c, 4) - fmat.at<int>(index, 4)) * (umat.at<int>(c, 4) - fmat.at<int>(index, 4))) / (dF[c] + 0.0000001));
 	}
 	return w;
 }
@@ -287,7 +288,7 @@ void Imagematting::getPreAlpha()
 	//fs.release();
 
 	// save in ".txt"
-	fstream f("array2.txt", ios::out);
+	fstream f("a2.txt", ios::out);
 	if (!f) cout << "Error!" << endl;
 	for (int i = 0; i < height; i++)
 	{
@@ -573,34 +574,50 @@ void   Imagematting::getFinalAlpha()
 	getL();
 	// (I + T(L) * L) * alpha = I * G
 	SpMat A = I + (L.transpose() * L);
-
-	// save data in A.txt
-	fstream f("A.txt", ios::out);
-	for (int k = 0; k < A.outerSize(); ++k)
-	{
-		for (Eigen::SparseMatrix<double>::InnerIterator it(A, k); it; ++it)
-		{
-			f << it.value() << "  ";
-		}
-	}
-	f.close();
+	A.prune(0.0, 1e-10);
+	saveMarket(A, "A2.mtx");
 	
 	VectorXd b = I * G;
-	SpMat AtA(N, N);
-	AtA = A.transpose() * A; // here are some errors
-	VectorXd AtB = A.transpose() * b;
 
 	clock_t start, finish;
 	start = clock();
 
-	ConjugateGradient<SpMat> cg(AtA); // use CG method
-	Alpha.setZero();
-	Alpha = cg.solve(AtB);
+	//ConjugateGradient<SpMat> cg(A.transpose() * A); // use CG method
+	//Alpha.setZero();
+	//Alpha = cg.solve(A.transpose() * b);
+
+	SimplicialLDLT<SpMat> ldlt(A);
+	Alpha = ldlt.solve(b);
 
 	finish = clock();
 	cout << double(finish - start) / CLOCKS_PER_SEC << endl;
 
+	//let Alpha between 0-1
+//	Alpha = Alpha.cwiseAbs(); // abs
+	saveMarket(Alpha, "Alpha.mtx");
 	cout << "getFinalAlpha ok" << endl;
+}
+
+void Imagematting::showMatte()
+{
+	int h = matte->height;
+	int w = matte->width;
+	uchar *udata = (uchar *)matte->imageData;
+	//for (int i = 2; i < N; i++)
+	//{
+	//	int x = (i - 2) / width;
+	//	int y = (i - 2) - x * width;
+	//	udata[x * step + y] = int(Alpha(i) * 255);
+	//	cout << int(udata[x * step + y]) << endl;
+	//}
+	for (int i = 0; i < height; i++)
+	{
+		for (int j = 0; j < width; j++)
+		{
+			int index = i * width + j + 2;
+			udata[i * g_step + j] = int(Alpha[index] * 255);
+		}
+	}
 }
 
 void Imagematting::save(char * filename)
@@ -608,78 +625,32 @@ void Imagematting::save(char * filename)
 	cvSaveImage(filename, matte);
 }
 
-void Imagematting::showMatte()
-{
-	uchar *udata = (uchar *)matte->imageData;
-	for (int i = 2; i < N; i++)
-	{
-		int x = (i - 2) / width;
-		int y = (i - 2) - x * width;
-		udata[x * step + y] = Alpha(i) * 255;
-	}
-	cvNamedWindow("window", CV_WINDOW_AUTOSIZE);
-	cvShowImage("window", matte);
-	cvWaitKey(100);
-	cvReleaseImage(&matte);
-	cvDestroyWindow("window");
-}
-
 void   Imagematting::solveAlpha()
 {
 	clock_t start, finish;
 	
-
-//	findKnearest(); // get K nearest backgrounds(indices + dists) 
+	findKnearest(); // get K nearest backgrounds(indices + dists) 
 	
-	// read four mats in "Kdata.xml"
-	FileStorage fs("Kdata2.xml", FileStorage::READ);
-	fs["findices"] >> fresult.indices;
-	fs["bindices"] >> bresult.indices;
-	fs["w3indices"] >> w3result.indices;
-	fs.release();
+	//// read four mats in "Kdatas.xml"
+	//FileStorage fs("K1.xml", FileStorage::READ);
+	//fs["findices"] >> fresult.indices;
+	//fs["bindices"] >> bresult.indices;
+	//fs["w3indices"] >> w3result.indices;
+	//fs.release(); 
 
-//	getPreAlpha(); // get predicted alpha of every pixel
+	getPreAlpha(); // get predicted alpha of every pixel
 
-	// get array preAlpha
-	fstream f("array2.txt", ios::in);
-	for (int i = 0; i < height; i++)
-	{
-		for (int j = 0; j < width; j++)
-		{
-			f >> preAlpha[i][j];
-		}
-	}
+	//// get array preAlpha
+	//fstream f("a1.txt", ios::in);
+	//for (int i = 0; i < height; i++)
+	//{
+	//	for (int j = 0; j < width; j++)
+	//	{
+	//		f >> preAlpha[i][j];
+	//	}
+	//}
 
 	getFinalAlpha();
 
-//	showMatte();
-
+	showMatte();
 }
-
-//// read preAlpha in "Array.xml"
-//FileStorage fs2("Array.xml", FileStorage::READ);
-//fs2["preAlpha"] >> preAlpha;
-//fs2.release();
-
-//// save in ".txt"
-//// compute and set array fAlpha
-//fstream f("array.txt", ios::out);
-//if (!f) cout << "Error!" << endl;
-//for (int i = 0; i < height; i++)
-//{
-//	for (int j = 0; j < width; j++)
-//	{
-//		f << fAlpha[i][j] << endl;
-//	}
-//}
-//f.close();
-
-//// get array fAlpha
-//f.open("array.txt", ios::in);
-//for (int i = 0; i < height; i++)
-//{
-//	for (int j = 0; j < width; j++)
-//	{
-//		f >> fAlpha[i][j];
-//	}
-//}

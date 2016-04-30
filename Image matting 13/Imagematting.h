@@ -15,7 +15,7 @@ using namespace std;
 using namespace cv;
 using namespace Eigen;
 
-#define K       20 // the nearst K neighbors(B/F) in RGBXY space
+#define K       5 // the nearst K neighbors(B/F) in RGBXY space
 #define winSize 3 // the size of a neighbor matrix
 #define sigma   0.1
 #define delta   0.1
@@ -39,7 +39,8 @@ private:
 	IplImage *matte; // the result image
 	int      height;
 	int      width;
-	int      step;
+	int      step; // widthstep of image
+	int      g_step; // widthstep of gray
 	int      channels;
 	uchar*   data;
 	int      N; // N = height * width + 2; order: VirtueF, VirtueB, all nodes ((0, 0), бнбн, (height - 1, width - 1))
@@ -50,6 +51,9 @@ private:
 	Mat      bmat; // mat of background pixels
 	Mat      fmat; // mat of foreground pixels
 	Mat      umat; // mat of unknown pixels
+	Mat bmat2;
+	Mat fmat2;
+	Mat umat2;
 	Mat      allmat; // mat of all pixels
 	int      *dB; // the min distance between C and B
 	int      *dF; // the min distance between C and F
