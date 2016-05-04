@@ -5,7 +5,7 @@ Imagematting::Imagematting()
 	bsize = 0;
 	fsize = 0;
 	usize = 0;
-	covarienceOfMat = cvCreateMat(3, 3, CV_64FC1); // n * n (channel * channel) 
+	covarienceOfMat = cvCreateMat(3, 3, CV_64FC1); // n * n (channel * channel)
 	avgOfMat = cvCreateMat(1, 3, CV_64FC1); // 1 * n (1 * channel)
 }
 
@@ -34,7 +34,7 @@ void Imagematting::loadImage(char * filename)
 	data = (uchar *)img->imageData;
 	tri = new int*[height];
 	preAlpha = new double*[height];
-	for (int i = 0; i < height; ++i) 
+	for (int i = 0; i < height; ++i)
 	{
 		tri[i] = new int[width];
 		preAlpha[i] = new double[width];
@@ -93,13 +93,15 @@ void Imagematting::loadTrimap(char * filename)
 	cout << "loadtrimap ok " << endl;
 }
 
+
+
 void Imagematting::addInMat(Mat &mat, int n, int i, int j, int b, int g, int r)
 {
-	mat.at<int>(n, 0) = i;
-	mat.at<int>(n, 1) = j;
-	mat.at<int>(n, 2) = b;
-	mat.at<int>(n, 3) = g;
-	mat.at<int>(n, 4) = r;
+  AT(mat, n, 0) = i;
+  AT(mat, n, 1) = j;
+  AT(mat, n, 2) = b;
+  AT(mat, n, 3) = g;
+  AT(mat, n, 4) = r;
 }
 
 void Imagematting::createMat()
@@ -147,7 +149,11 @@ void Imagematting::createMat()
 
 void Imagematting::findKnearest()// build 2 KD-trees
 {
-	flann::Index tree1(bmat, flann::KDTreeIndexParams(4));// create kd-tree for background
+   Mat M1;
+  bmat.col(3).copyTo(M1);
+//	flann::Index tree1(bmat(Range::all(), Range(2, 5)), flann::KDTreeIndexParams(4));// create kd-tree for background
+
+        flann::Index tree1(M1, flann::KDTreeIndexParams(4));// create kd-tree for background
 	tree1.knnSearch(umat, bresult.indices, bresult.dists, K); // search kd-tree
 
 	flann::Index tree2(fmat, flann::KDTreeIndexParams(4));// create kd-tree for foreground
@@ -156,42 +162,41 @@ void Imagematting::findKnearest()// build 2 KD-trees
 	flann::Index tree3(allmat, flann::KDTreeIndexParams(4));// create kd-tree for all pixels
 	tree3.knnSearch(allmat, w3result.indices, w3result.dists, K); // search kd-tree
 
-	//FileStorage fs("K2.xml", FileStorage::WRITE); // save the data
-	//fs << "bindices" << bresult.indices;
-	//fs << "findices" << fresult.indices;
-	//fs << "w3indices" << w3result.indices;
-	//fs.release();
+	FileStorage fs("K2.xml", FileStorage::WRITE); // save the data
+	fs << "bindices" << bresult.indices;
+	fs << "findices" << fresult.indices;
+	fs << "w3indices" << w3result.indices;
+	fs.release();
 
 	cout << "get kdtree ok " << endl;
 }
- 
+
 double Imagematting::geteveryAlpha(int c, int f, int b) //f is the fth-nearest pixel of C, b is the bth-nearest pixel of C
 {
-	int findex = fresult.indices.at<int>(c, f);
-	int bindex = bresult.indices.at<int>(c, b);
+  int findex = AT(fresult.indices, c, f);
+  int bindex = AT(bresult.indices, c, b);
 
-	double alpha = ((umat.at<int>(c, 2) - bmat.at<int>(bindex, 2)) * (fmat.at<int>(findex, 2) - bmat.at<int>(bindex, 2)) +
-		(umat.at<int>(c, 3) - bmat.at<int>(bindex, 3)) * (fmat.at<int>(findex, 3) - bmat.at<int>(bindex, 3)) +
-		(umat.at<int>(c, 4) - bmat.at<int>(bindex, 4)) * (fmat.at<int>(findex, 4) - bmat.at<int>(bindex, 4)))
-		/ (((fmat.at<int>(findex, 2) - bmat.at<int>(bindex, 2)) * (fmat.at<int>(findex, 2) - bmat.at<int>(bindex, 2)) +
-		(fmat.at<int>(findex, 3) - bmat.at<int>(bindex, 3)) * (fmat.at<int>(findex, 3) - bmat.at<int>(bindex, 3)) +
-		(fmat.at<int>(findex, 4) - bmat.at<int>(bindex, 4)) * (fmat.at<int>(findex, 4) - bmat.at<int>(bindex, 4))) + 0.0000001);
+  double alpha = ((AT(umat, c, 2) - AT(bmat, bindex, 2)) * (AT(fmat, findex, 2) - AT(bmat, bindex, 2)) +
+                  (AT(umat, c, 3) - AT(bmat, bindex, 3)) * (AT(fmat, findex, 3) - AT(bmat, bindex, 3)) +
+                  (AT(umat, c, 4) - AT(bmat, bindex, 4)) * (AT(fmat, findex, 4) - AT(bmat, bindex, 4)))
+    / ((AT(fmat, findex, 2) - AT(bmat, bindex, 2)) * (AT(fmat, findex, 2) - AT(bmat, bindex, 2)) +
+		(AT(fmat, findex, 3) - AT(bmat, bindex, 3)) * (AT(fmat, findex, 3) - AT(bmat, bindex, 3)) +
+		(AT(fmat, findex, 4) - AT(bmat, bindex, 4)) * (AT(fmat, findex, 4) - AT(bmat, bindex, 4)) + 0.0000001);
 	return min(1.0, max(0.0, alpha));
 }
 
 double Imagematting::getRd(int c, int f, int b) //f is the fth-nearest pixel of C, b is the bth-nearest pixel of C
 {
 	double alpha = geteveryAlpha(c, f, b);
+        int findex = AT(fresult.indices, c, f);
+        int bindex = AT(bresult.indices, c, b);
 
-	int findex = fresult.indices.at<int>(c, f);
-	int bindex = bresult.indices.at<int>(c, b);
-
-	double result = sqrt(((umat.at<int>(c, 2) - alpha * fmat.at<int>(findex, 2) - (1 - alpha) * bmat.at<int>(bindex, 2)) * (umat.at<int>(c, 2) - alpha *  fmat.at<int>(findex, 2) - (1 - alpha) * bmat.at<int>(bindex, 2)) +
-		(umat.at<int>(c, 3) - alpha * fmat.at<int>(findex, 3) - (1 - alpha) * bmat.at<int>(bindex, 3)) * (umat.at<int>(c, 3) - alpha * fmat.at<int>(findex, 3) - (1 - alpha) * bmat.at<int>(bindex, 3)) +
-		(umat.at<int>(c, 4) - alpha * fmat.at<int>(findex, 4) - (1 - alpha) * bmat.at<int>(bindex, 4)) * (umat.at<int>(c, 4) - alpha * fmat.at<int>(findex, 4) - (1 - alpha) * bmat.at<int>(bindex, 4))) /
-		(((fmat.at<int>(findex, 2) - bmat.at<int>(bindex, 2)) * (fmat.at<int>(findex, 2) - bmat.at<int>(bindex, 2)) +
-		(fmat.at<int>(findex, 3) - bmat.at<int>(bindex, 3)) * (fmat.at<int>(findex, 3) - bmat.at<int>(bindex, 3)) +
-		(fmat.at<int>(findex, 4) - bmat.at<int>(bindex, 4)) * (fmat.at<int>(findex, 4) - bmat.at<int>(bindex, 4))) + 0.0000001));
+	double result = sqrt(((AT(umat, c, 2) - alpha * AT(fmat, findex, 2) - (1 - alpha) * AT(bmat, bindex, 2)) * (AT(umat, c, 2) - alpha * AT(fmat, findex, 2) - (1 - alpha) * AT(bmat, bindex, 2)) +
+		(AT(umat, c, 3) - alpha * AT(fmat, findex, 3) - (1 - alpha) * AT(bmat, bindex, 3)) * (AT(umat, c, 3) - alpha * AT(fmat, findex, 3) - (1 - alpha) * AT(bmat, bindex, 3)) +
+		(AT(umat, c, 4) - alpha * AT(fmat, findex, 4) - (1 - alpha) * AT(bmat, bindex, 4)) * (AT(umat, c, 4) - alpha * AT(fmat, findex, 4) - (1 - alpha) * AT(bmat, bindex, 4))) /
+		(((AT(fmat, findex, 2) - AT(bmat, bindex, 2)) * (AT(fmat, findex, 2) - AT(bmat, bindex, 2)) +
+		(AT(fmat, findex, 3) - AT(bmat, bindex, 3)) * (AT(fmat, findex, 3) - AT(bmat, bindex, 3)) +
+		(AT(fmat, findex, 4) - AT(bmat, bindex, 4)) * (AT(fmat, findex, 4) - AT(bmat, bindex, 4))) + 0.0000001));
 //	return result / 255.0;  //?????????????????????
 	return result;
 }
@@ -201,18 +206,30 @@ void Imagematting::getD() // correspond to umat
 	// get db, df of every pixel
 	dB = new int[usize];
 	dF = new int[usize];
+        double min1 = 0, min2 = 0;
 	for (int i = 0; i < usize; i++)
 	{
 		// calculate d2
-		int bindex = bresult.indices.at<int>(i, 0); // get the nearest background of C
-		dB[i] = 0;
+          dB[i] = 200000;
+          dF[i] = 200000;
+          for (int k = 0; k < K; k++)
+            {
+		int bindex = AT(bresult.indices, i, k); // get the nearest background of C
 		for (int j = 2; j < 5; j++)
-			dB[i] += (umat.at<int>(i, j) - bmat.at<int>(bindex, j)) * (umat.at<int>(i, j) - bmat.at<int>(bindex, j));
+                  {
+                        min1 = 0;
+		        min1 += (AT(umat, i, j) - AT(bmat, bindex, j)) * (AT(umat, i, j) - AT(bmat, bindex, j));
+                  }
+                if (min1 < dB[i]) dB[i] = min1;
 
-		int findex = fresult.indices.at<int>(i, 0); // get the nearest foreground of C
-		dF[i] = 0;
+		int findex = AT(fresult.indices, i, k); // get the nearest foreground of C
 		for (int j = 2; j < 5; j++)
-			dF[i] += (umat.at<int>(i, j) - fmat.at<int>(findex, j)) * (umat.at<int>(i, j) - fmat.at<int>(findex, j));
+                  {
+                        min2 = 0;
+			min2 += (AT(umat, i, j) - AT(fmat, findex, j)) * (AT(umat, i, j) - AT(fmat, findex, j));
+                  }
+                if (min2 < dF[i]) dF[i] = min2;
+            }
 	}
 	cout << "getD ok " << endl;
 }
@@ -223,23 +240,23 @@ double Imagematting::getW(int c, int fb, bool flag) // flag == 1, f; flag == 0, 
 
 	if (flag == 0) // b
 	{
-		int index = bresult.indices.at<int>(c, fb);
-		w = exp(-((umat.at<int>(c, 2) - bmat.at<int>(index, 2)) * (umat.at<int>(c, 2) - bmat.at<int>(index, 2)) +
-			(umat.at<int>(c, 3) - bmat.at<int>(index, 3)) * (umat.at<int>(c, 3) - bmat.at<int>(index, 3)) +
-			(umat.at<int>(c, 4) - bmat.at<int>(index, 4)) * (umat.at<int>(c, 4) - bmat.at<int>(index, 4))) / (dB[c] + 0.0000001));
+		int index = AT(bresult.indices, c, fb);
+		w = exp(-((AT(umat, c, 2) - AT(bmat, index, 2)) * (AT(umat, c, 2) - AT(bmat, index, 2)) +
+			(AT(umat, c, 3) - AT(bmat, index, 3)) * (AT(umat, c, 3) - AT(bmat, index, 3)) +
+			(AT(umat, c, 4) - AT(bmat, index, 4)) * (AT(umat, c, 4) - AT(bmat, index, 4))) / (dB[c] + 0.0000001));
 	}
 	else // f
 	{
-		int index = fresult.indices.at<int>(c, fb);
-		w = exp(-((umat.at<int>(c, 2) - fmat.at<int>(index, 2)) * (umat.at<int>(c, 2) - fmat.at<int>(index, 2)) +
-			(umat.at<int>(c, 3) - fmat.at<int>(index, 3)) * (umat.at<int>(c, 3) - fmat.at<int>(index, 3)) +
-			(umat.at<int>(c, 4) - fmat.at<int>(index, 4)) * (umat.at<int>(c, 4) - fmat.at<int>(index, 4))) / (dF[c] + 0.0000001));
+                int index = AT(fresult.indices, c, fb);
+		w = exp(-((AT(umat, c, 2) - AT(fmat, index, 2)) * (AT(umat, c, 2) - AT(fmat, index, 2)) +
+			(AT(umat, c, 3) - AT(fmat, index, 3)) * (AT(umat, c, 3) - AT(fmat, index, 3)) +
+			(AT(umat, c, 4) - AT(fmat, index, 4)) * (AT(umat, c, 4) - AT(fmat, index, 4))) / (dF[c] + 0.0000001));
 	}
 	return w;
 }
 
 double Imagematting::getConfidence(int c, int f, int b)  //f is the fth-nearest foreground pixel of C, b is the bth-nearest background pixel of C
-{		
+{
 	double confi;
 	confi = exp(-(getRd(c, f, b) * getRd(c, f, b) * getW(c, f, 1) * getW(c, b, 0)) / (sigma * sigma)); //////////////getW 部分有重复可简化
 	return confi;
@@ -247,14 +264,14 @@ double Imagematting::getConfidence(int c, int f, int b)  //f is the fth-nearest 
 
 void Imagematting::getPreAlpha()
 {
-	getD(); 
+	getD();
 	// calculate confidence of every unknown pixel
 	for (int i = 0; i < usize; i++)
 	{
-		int Ci = umat.at<int>(i, 0);
-		int Cj = umat.at<int>(i, 1);
-		// choose three pairs which have the biggest confidence of every unknown pixel and mean their alpha as the predicted alpha --- fAlpha 
-		double alpha1 = 0, alpha2 = 0, alpha3 = 0; 
+		int Ci = AT(umat, i, 0);
+		int Cj = AT(umat, i, 1);
+		// choose three pairs which have the biggest confidence of every unknown pixel and mean their alphas as the predicted alpha --- fAlpha
+		double alpha1 = 0, alpha2 = 0, alpha3 = 0;
 		double confi1 = 0, confi2 = 0, confi3 = 0; // 1 > 2 > 3
 		for (int f = 0; f < K; f++)
 		{
@@ -337,11 +354,11 @@ void   Imagematting::getCiCj(CvMat *mat, int i, int j)
 	cvmSet(mat, 0, 2, data[i * step + j * channels + 2]);
 }
 
-void   Imagematting::getWeight1() // get data term W(i, F) & W(i, B) 
+void   Imagematting::getWeight1() // get data term W(i, F) & W(i, B)
 {
 	std::vector<T> triplets;
 	triplets.push_back(T(0, 0, gamma)); //W1(0, 0) = gamma; W1(0, 1) = 0;
-	triplets.push_back(T(1, 1, gamma)); //W1(1, 1) = gamma; W1(1, 0) = 0; 
+	triplets.push_back(T(1, 1, gamma)); //W1(1, 1) = gamma; W1(1, 0) = 0;
 	for (int i = 2; i < N; i++) // 0, 1 are two virtue nodes
 	{
 		int x = (i - 2) / width;
@@ -350,13 +367,13 @@ void   Imagematting::getWeight1() // get data term W(i, F) & W(i, B)
 		{
 			triplets.push_back(T(i, 0, gamma * tri[x][y]));
 			triplets.push_back(T(i, 1, gamma * (1 - tri[x][y])));
-			triplets.push_back(T(i, i, gamma * tri[x][y] + gamma * (1 - tri[x][y]))); // add to L(i, i)
+			triplets.push_back(T(i, i, gamma)); // add to L(i, i)
 		}
 		else
 		{
 			triplets.push_back(T(i, 0, gamma * preAlpha[x][y]));
 			triplets.push_back(T(i, 1, gamma * (1 - preAlpha[x][y])));
-			triplets.push_back(T(i, i, gamma * preAlpha[x][y] + gamma * (1 - preAlpha[x][y]))); // add to L(i, i)
+			triplets.push_back(T(i, i, gamma)); // add to L(i, i)
 		}
 	}
 	W1.setFromTriplets(triplets.begin(), triplets.end());
@@ -378,8 +395,8 @@ void   Imagematting::getWeight2() // get local smooth term Wlap(ij)
 	for (int i = 0; i < usize; i++) 
 	{
 		w = 0;
-		int Ci = umat.at<int>(i, 0);
-		int Cj = umat.at<int>(i, 1);
+		int Ci = AT(umat, i, 0);
+		int Cj = AT(umat, i, 1);
 		getCiCj(CiMat, Ci, Cj);
 		// get 4 weights: up, down, left, right
 		//left (Ci, Cj - 1)
@@ -511,16 +528,16 @@ void   Imagematting::getWeight3() // get unlocal smooth term Wlle(ij)
 		for (int j = 0; j < 5; j++) Y(j) = allmat.at<int>(i - 2, j);
 		for (int j = 0; j < K; j++) // search the K-nearest pixels in RGBXY
 		{
-			int index = w3result.indices.at<int>(i - 2, j); // index + 2 is the index in N ///////////////////////下面要修改
-			X.row(j) << allmat.at<int>(index, 0), allmat.at<int>(index, 1), allmat.at<int>(index, 2), allmat.at<int>(index, 3), allmat.at<int>(index, 4); 
+			int index =AT(w3result.indices, i - 2, j); // index + 2 is the index in N ///////////////////////下面要修改
+			X.row(j) << AT(allmat, index, 0), AT(allmat, index, 1),  AT(allmat, index, 2), AT(allmat, index, 3),  AT(allmat, index, 4); 
 		}
 		// W = (X * T(X))^-1 * X * Y
 	//	W = (X * X.transpose()).inverse() * X * Y;
 		W = (X.transpose()).colPivHouseholderQr().solve(Y);
-		
+
 		for (int j = 0; j < K; j++) // search the K-nearest pixels in RGBXY
 		{
-			int Knearest = w3result.indices.at<int>(i - 2, j) + 2; // Knearest is the index of K-nearest neighbors of i
+			int Knearest =AT(w3result.indices, i - 2, j) + 2; // Knearest is the index of K-nearest neighbors of i
 			triplets.push_back(T(i, Knearest, W(j)));
 			triplets.push_back(T(i, i, W(j))); // add to L(i, i)
 		}
@@ -576,7 +593,7 @@ void   Imagematting::getFinalAlpha()
 	SpMat A = I + (L.transpose() * L);
 	A.prune(0.0, 1e-10);
 	saveMarket(A, "A2.mtx");
-	
+
 	VectorXd b = I * G;
 
 	clock_t start, finish;
@@ -616,6 +633,7 @@ void Imagematting::showMatte()
 		{
 			int index = i * width + j + 2;
 			udata[i * g_step + j] = int(Alpha[index] * 255);
+                        //    cout << Alpha[index] * 255 <<endl;
 		}
 	}
 }
@@ -628,29 +646,29 @@ void Imagematting::save(char * filename)
 void   Imagematting::solveAlpha()
 {
 	clock_t start, finish;
-	
-	findKnearest(); // get K nearest backgrounds(indices + dists) 
-	
-	//// read four mats in "Kdatas.xml"
-	//FileStorage fs("K1.xml", FileStorage::READ);
-	//fs["findices"] >> fresult.indices;
-	//fs["bindices"] >> bresult.indices;
-	//fs["w3indices"] >> w3result.indices;
-	//fs.release(); 
 
-	getPreAlpha(); // get predicted alpha of every pixel
+	findKnearest(); // get K nearest backgrounds(indices + dists)
 
-	//// get array preAlpha
-	//fstream f("a1.txt", ios::in);
-	//for (int i = 0; i < height; i++)
-	//{
-	//	for (int j = 0; j < width; j++)
-	//	{
-	//		f >> preAlpha[i][j];
-	//	}
-	//}
+//// read four mats in "Kdatas.xml"
+//FileStorage fs("K1.xml", FileStorage::READ);
+//fs["findices"] >> fresult.indices;
+//fs["bindices"] >> bresult.indices;
+//fs["w3indices"] >> w3result.indices;
+//fs.release();
 
-	getFinalAlpha();
+getPreAlpha(); // get predicted alpha of every pixel
 
-	showMatte();
+//// get array preAlpha
+//fstream f("a1.txt", ios::in);
+//for (int i = 0; i < height; i++)
+//{
+//for (int j = 0; j < width; j++)
+//{
+//f >> preAlpha[i][j];
+//}
+//}
+
+getFinalAlpha();
+
+showMatte();
 }

@@ -18,6 +18,7 @@ int main()
 //	}
 //	cout << sum / 15 << endl;
 
-	system("pause");
+//	system("pause");
 	return 0;
 }
+
