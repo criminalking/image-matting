@@ -165,7 +165,7 @@ void Imagematting::findKnearest()// build 2 KD-trees
 	tree2.knnSearch(umat, fresult.indices, fresult.dists, K); // search kd-tree
 
 	flann::Index tree3(allmat, flann::KDTreeIndexParams(4));// create kd-tree for all pixels
-	tree3.knnSearch(allmat, allresult.indices, allresult.dists, K); // search kd-tree
+	tree3.knnSearch(allmat, allresult.indices, allresult.dists, K + 1); // search kd-tree, notice: result includes pixel which searchs for neighbors, thus need +1 
 
 	FileStorage fs("K2.xml", FileStorage::WRITE); // save the data
 	fs << "bindices" << bresult.indices;
@@ -637,22 +637,33 @@ void   Imagematting::getWeight3() // get unlocal smooth term Wlle(ij), use LLE
 	for (int i = 2; i < N; i++)
 	{
 		VectorXd Y(5, 1);
-		MatrixXd X(K, 5);
+		MatrixXd X(K + 1, 5);
                 MatrixXd XtX(K, K); // Xt is the transposition of X
                 MatrixXd I(K, K); // identity matrix
 		VectorXd W(K, 1); // need to compute
                 I = MatrixXd::Identity(K, K);
                 for (int j = 0; j < 5; j++) Y(j) = AT(allmat, i - 2, j);
-                //    if (i == 1000) cout << Y << "   ";
-		for (int j = 0; j < K; j++) // search the K-nearest pixels in RGBXY
+		for (int j = 0; j < K + 1; j++) // search the K-nearest pixels in RGBXY
 		{
 			int index = AT(allresult.indices, i - 2, j); // index + 2 is the index in N ///////////////////////ÏÂÃæÒªÐÞ¸Ä
 			X.row(j) << AT(allmat, index, 0), AT(allmat, index, 1),  AT(allmat, index, 2), AT(allmat, index, 3),  AT(allmat, index, 4);
-                        //       if (i == 1000) cout << X.row(j) << endl;
                         X.row(j) = Y.transpose() - X.row(j);
-
 		}
 
+                // remove itself from K+1 neighbors, only remove one row
+                VectorXd ze = VectorXd::Zero(5);
+                for (int j = 0; j < K + 1; j++)
+                {
+                  if (X.row(j) == ze.transpose()) // all zeros
+                    {
+                      if (j < K) X.block(j, 0, K - j, 5) = X.block(j + 1, 0, K - j, 5);
+                      X.conservativeResize(K, 5);
+                      break;
+                    }
+                  if (j == K) X.conservativeResize(K, 5); // if no zero, remove the last row
+                }
+
+                // now only K neighbors
                 XtX = X * X.transpose();
                 double tr = XtX.trace();
                 XtX  = XtX + del * I * tr;
@@ -716,7 +727,6 @@ void   Imagematting::getFinalAlpha()
 	getI();
 	getG();
 	getL();
-        //    TEST(L);
 	// (I + T(L) * L) * alpha = I * G
 	SpMat A = I + (L.transpose() * L);
 	A.prune(0.0); // delete zero
@@ -731,14 +741,11 @@ void   Imagematting::getFinalAlpha()
 	//Alpha = cg.solve(b);
 
 	SimplicialLDLT<SpMat> ldlt(A);
-	Alpha = ldlt.solve(b);
+	Alpha = ldlt.solve(b); // all alpha are more than 0
 
 	finish = clock();
 	cout << double(finish - start) / CLOCKS_PER_SEC << endl;
 
-	//let Alpha between 0-1
-	Alpha = Alpha.cwiseAbs(); // abs
-	saveMarket(Alpha, "Alpha.mtx");
 	cout << "getFinalAlpha ok" << endl;
 }
 
@@ -757,9 +764,9 @@ void Imagematting::showMatte()
 		for (int j = 0; j < width; j++)
 		{
 			int index = i * width + j + 2;
+                        //if (Alpha[index] < 0) cout << Alpha[index] * 255 << "   ";
                         udata[i * g_step + j] = int(Alpha[index] * 255);
-                        //          udata[i * g_step + j] = int(preAlpha[i][j] * 255);
-                        //    cout << Alpha[index] * 255 <<endl;
+                        //udata[i * g_step + j] = int(preAlpha[i][j] * 255); // pnly use preAlpha 
 		}
 	}
 }
@@ -775,26 +782,26 @@ void   Imagematting::solveAlpha()
 
 	findKnearest(); // get K nearest backgrounds(indices + dists)
 
-//// read four mats in "Kdatas.xml"
-//FileStorage fs("K1.xml", FileStorage::READ);
-//fs["findices"] >> fresult.indices;
-//fs["bindices"] >> bresult.indices;
-//fs["allindices"] >> allresult.indices;
-//fs.release();
+        //// read four mats in "Kdatas.xml"
+        //FileStorage fs("K1.xml", FileStorage::READ);
+        //fs["findices"] >> fresult.indices;
+        //fs["bindices"] >> bresult.indices;
+        //fs["allindices"] >> allresult.indices;
+        //fs.release();
 
-getPreAlpha(); // get predicted alpha of every pixel
+        getPreAlpha(); // get predicted alpha of every pixel
 
-//// get array preAlpha
-//fstream f("a1.txt", ios::in);
-//for (int i = 0; i < height; i++)
-//{
-//for (int j = 0; j < width; j++)
-//{
-//f >> preAlpha[i][j];
-//}
-//}
+        //// get array preAlpha
+        //fstream f("a1.txt", ios::in);
+        //for (int i = 0; i < height; i++)
+        //{
+        //for (int j = 0; j < width; j++)
+        //{
+        //f >> preAlpha[i][j];
+        //}
+        //}
 
-getFinalAlpha();
+        getFinalAlpha();
 
-showMatte();
+        showMatte();
 }
