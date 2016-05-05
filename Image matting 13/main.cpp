@@ -3,20 +3,15 @@
 
 int main()
 {
-
-	//while(n--){
-	Imagematting sm;
+        Imagematting sm;
 	clock_t start, finish;
 	start = clock();
-	sm.loadImage("aaa.jpg");
-	sm.loadTrimap("bbb.jpg");
+	sm.loadImage("abc.png");
+	sm.loadTrimap("abc2.png");
 	sm.solveAlpha();
 	sm.save("result.jpg");
 	finish = clock();
 	cout << double(finish - start) / CLOCKS_PER_SEC << endl;
-//	sum += double(finish - start) / CLOCKS_PER_SEC;
-//	}
-//	cout << sum / 15 << endl;
 
 //	system("pause");
 	return 0;

@@ -15,12 +15,12 @@ using namespace std;
 using namespace cv;
 using namespace Eigen;
 
-#define K       5 // the nearst K neighbors(B/F) in RGBXY space
+#define K       10 // the nearst K neighbors(B/F) in RGBXY space
 #define winSize 3 // the size of a neighbor matrix
 #define sigma   0.1
 #define delta   0.1
 #define gamma   0.1
-#define RC      1e-5
+#define REG     1e-5
 
 #define AT(mat, x, y) mat.at<int>(x, y)
 
@@ -53,19 +53,17 @@ private:
 	Mat      bmat; // mat of background pixels
 	Mat      fmat; // mat of foreground pixels
 	Mat      umat; // mat of unknown pixels
-	Mat bmat2;
-	Mat fmat2;
-	Mat umat2;
 	Mat      allmat; // mat of all pixels
 	int      *dB; // the min distance between C and B
 	int      *dF; // the min distance between C and F
 	int      **tri; // 1 is foreground, 0 is background, 2 is unknown
 	double   **preAlpha; // mat of predicted alpha (n * 1 matrix)
+        double   **confidence; // confidence for every pixel
 
 	CvMat*   covarienceOfMat; // covarience Matrix in 3*3 window
 	CvMat*   avgOfMat; // average Matrix in 3*3 window
 
-	kdResult bresult, fresult, w3result; // the results of kd-tree by using FLANN
+	kdResult bresult, fresult, allresult; // the results of kd-tree by using FLANN
 
 	// for eigen
 	SpMat    W1; // save W(i, F) & W(i, B) in a big SparseMatrix W1(N * N)
@@ -76,7 +74,8 @@ private:
 	VectorXd G;  // G is a Vector
 	VectorXd Alpha; // the final alpha
 
-	void     addInMat(Mat &mat, int n, int i, int j, int b, int g, int r); // add a RGBXY parameter in mat
+	void     addInMat(Mat &mat, int n, int i, int j, int b, int g, int r); // add a RGBXY parameter in allmat
+        void     addInMat(Mat &mat, int n, int x, int y); // add a XY parameter in  mat
 	void     createMat(); // create b-, f-, u-, allmat
 
 	void     getD(); //the minimum distances between foreground/background sample and the current pixel
@@ -95,10 +94,14 @@ private:
 	void     getI();
 	void     getL(); // get L
 
+        int      BC(Mat &mat, int index);
+        int      GC(Mat &mat, int index);
+        int      RC(Mat &mat, int index);
+
 public:
 	Imagematting();
 	~Imagematting();
-	
+
 	void     loadImage(char * filename);
 	void     loadTrimap(char * filename);
 
@@ -109,6 +112,11 @@ public:
 	void     save(char * filename);
 	void     solveAlpha();
 	void     showMatte();
+
+        //test
+
+        void TEST(SpMat A);
+        void testgetWeight2();
 };
 
 #endif //IMAGEMATTING_H
