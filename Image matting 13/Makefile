@@ -6,7 +6,7 @@ BIN_NAME := main
 CPP_FILES := $(wildcard ./*.cpp)
 
 build:
-	@$(GXX) main.cpp Imagematting.cpp $(OPENCV_LD_FLAGS) $(OPENCV_C_FLAGS) -o $(BIN_NAME)
+	@$(GXX) main.cpp Imagematting.cpp $(OPENCV_LD_FLAGS) $(OPENCV_C_FLAGS) -o $(BIN_NAME) -O2
 
 run:
 	@./$(BIN_NAME)
