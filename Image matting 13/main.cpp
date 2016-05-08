@@ -6,8 +6,8 @@ int main()
   Imagematting sm;
   clock_t start, finish;
   start = clock();
-  sm.loadImage("highpic.png");
-  sm.loadTrimap("hightrimap.png");
+  sm.loadImage("lowpic.png");
+  sm.loadTrimap("lowtrimap.png");
   sm.solveAlpha();
   sm.save("result.jpg");
   finish = clock();

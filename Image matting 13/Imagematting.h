@@ -23,8 +23,6 @@ using namespace Eigen;
 #define REG        0.1
 #define CONFI      0.85
 #define lambda_E   1000
-#define HORIZONTAL 0
-#define VERTICAL   1
 
 #define AT(mat, x, y) mat.at<int>(x, y)
 
@@ -118,7 +116,7 @@ class Imagematting
   void     solveAlpha();
   void     showMatte();
 
-  //use for test
+  //just for test
   void     TEST(SpMat A);
 };
 

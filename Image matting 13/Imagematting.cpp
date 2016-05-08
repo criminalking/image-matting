@@ -20,7 +20,7 @@ Imagematting::~Imagematting()
 
 void Imagematting::loadImage(char * filename)
 {
-  img = cvLoadImage(filename, -1);
+  img = cvLoadImage(filename, CV_LOAD_IMAGE_COLOR);
   if (!img)
     {
       cout << "Loading Image Failed!" << endl;
@@ -54,7 +54,7 @@ void Imagematting::loadImage(char * filename)
 
 void Imagematting::loadTrimap(char * filename)
 {
-  trimap = cvLoadImage(filename, -1);
+  trimap = cvLoadImage(filename, CV_LOAD_IMAGE_GRAYSCALE);
   g_step = trimap->widthStep;
   if (!trimap)
     {
@@ -159,6 +159,9 @@ int bn = 0, fn = 0, un = 0, n = 0;
 
 void Imagematting::findKnearest()// build 2 KD-trees
 {
+  clock_t start, finish;
+
+  start = clock();
   flann::Index tree1(bmat, flann::KDTreeIndexParams(4));// create kd-tree for background
   tree1.knnSearch(umat, bresult.indices, bresult.dists, K); // search kd-tree
 
@@ -167,6 +170,9 @@ void Imagematting::findKnearest()// build 2 KD-trees
 
   flann::Index tree3(allmat, flann::KDTreeIndexParams(4));// create kd-tree for all pixels
   tree3.knnSearch(allmat, allresult.indices, allresult.dists, K + 1); // search kd-tree, notice: result includes pixel which searchs for neighbors, thus need +1
+
+  finish = clock();
+  cout << double(finish - start) / CLOCKS_PER_SEC << endl;
 
   // FileStorage fs("K2.xml", FileStorage::WRITE); // save the data
   // fs << "bindices" << bresult.indices;
@@ -433,11 +439,8 @@ void   Imagematting::getWeight2() // get local smooth term Wlap(ij)
         {
           // compute uk and sigmaK(update covarienceOfMat and avgOfMat)
           getCovarianceMatrix(i + 1, j + 1); //send the center point
-          cvAddWeighted(covarienceOfMat, 1, IdenMat, REG / 9, 0, reverseMat); //covarienceOfMat + REG/9 * I
+          cvAddWeighted(covarienceOfMat, 1, IdenMat, REG / 9.0, 0, reverseMat); //covarienceOfMat + REG/9 * I
           cvInvert(reverseMat, reverseMat, CV_SVD_SYM); //Mat = (Mat)-1
-
-          //geteveryWeight2(reverseMat, i, j, HORIZONTAL);
-          //geteveryWeight2(reverseMat, i, j, VERTICAL);
 
           //Wij = Wji
           //get W2 in horizontal direction
@@ -458,10 +461,10 @@ void   Imagematting::getWeight2() // get local smooth term Wlap(ij)
                   cvTranspose(stoMat2, stoMattr); // T(Cj - uk)const
                   cvMatMul(stoMat, stoMattr, result); // (Ci - uk) * (covarienceOfMat + REG/9 * I)-1 * T(Cj - uk)
                   w = 1 + cvmGet(result, 0, 0);
-                  triplets.push_back(T(x1 * width + y1 + 2, x2 * width + y2 + 2, -delta / 9 * w)); // Wij
-                  triplets.push_back(T(x2 * width + y2 + 2, x1 * width + y1 + 2, -delta / 9 * w)); // Wji
-                  triplets.push_back(T(x1 * width + y1 + 2, x1 * width + y1 + 2, delta / 9 * w)); // add to L(i, i)
-                  triplets.push_back(T(x2 * width + y2 + 2, x2 * width + y2 + 2, delta / 9 * w)); // add to L(i, i)
+                  triplets.push_back(T(x1 * width + y1 + 2, x2 * width + y2 + 2, -delta / 9.0 * w)); // Wij
+                  triplets.push_back(T(x2 * width + y2 + 2, x1 * width + y1 + 2, -delta / 9.0 * w)); // Wji
+                  triplets.push_back(T(x1 * width + y1 + 2, x1 * width + y1 + 2, delta / 9.0 * w)); // add to L(i, i)
+                  triplets.push_back(T(x2 * width + y2 + 2, x2 * width + y2 + 2, delta / 9.0 * w)); // add to L(i, i)
                 }
             }
 
@@ -483,10 +486,10 @@ void   Imagematting::getWeight2() // get local smooth term Wlap(ij)
                   cvTranspose(stoMat2, stoMattr); // T(Cj - uk)const
                   cvMatMul(stoMat, stoMattr, result); // (Ci - uk) * (covarienceOfMat + REG/9 * I)-1 * T(Cj - uk)
                   w = 1 + cvmGet(result, 0, 0);
-                  triplets.push_back(T(x1 * width + y1 + 2, x2 * width + y2 + 2, -delta / 9 * w)); // Wij
-                  triplets.push_back(T(x2 * width + y2 + 2, x1 * width + y1 + 2, -delta / 9 * w)); // Wji
-                  triplets.push_back(T(x1 * width + y1 + 2, x1 * width + y1 + 2, delta / 9 * w)); // add to L(i, i)
-                  triplets.push_back(T(x2 * width + y2 + 2, x2 * width + y2 + 2, delta / 9 * w)); // add to L(i, i)
+                  triplets.push_back(T(x1 * width + y1 + 2, x2 * width + y2 + 2, -delta / 9.0 * w)); // Wij
+                  triplets.push_back(T(x2 * width + y2 + 2, x1 * width + y1 + 2, -delta / 9.0 * w)); // Wji
+                  triplets.push_back(T(x1 * width + y1 + 2, x1 * width + y1 + 2, delta / 9.0 * w)); // add to L(i, i)
+                  triplets.push_back(T(x2 * width + y2 + 2, x2 * width + y2 + 2, delta / 9.0 * w)); // add to L(i, i)
                 }
             }
         }
@@ -499,6 +502,7 @@ void   Imagematting::getWeight2() // get local smooth term Wlap(ij)
   cvReleaseMat(&stoMat2);
   cvReleaseMat(&stoMattr);
   cvReleaseMat(&result);
+  W2.setFromTriplets(triplets.begin(), triplets.end());
   W2.prune(0.0);
   cout << "getWeight2 ok" << endl;
 }
@@ -525,7 +529,7 @@ void   Imagematting::getWeight3() // get unlocal smooth term Wlle(ij), use LLE
         }
 
       // remove itself from K+1 neighbors, only remove one row
-      int flag = K;
+      int flag = K; // flag is the index of the removed neighbor
       VectorXd ze = VectorXd::Zero(5);
       for (int j = 0; j < K + 1; j++)
         {
@@ -537,7 +541,7 @@ void   Imagematting::getWeight3() // get unlocal smooth term Wlle(ij), use LLE
               flag = j;
               break;
             }
-          if (j == K) X.conservativeResize(K, 5); // if no zero, remove the last row
+          if (j == K) X.conservativeResize(K, 5); // if no zero row, remove the last row
         }
 
       // now only K neighbors
@@ -548,13 +552,13 @@ void   Imagematting::getWeight3() // get unlocal smooth term Wlle(ij), use LLE
 
       for (int j = 0; j < K; j++) // search the K-nearest pixels in RGBXY
         {
-          W(j) = XtX.row(j).sum() / XtX.sum();
-          int  Knearest;
-          if (flag > j)
-            Knearest = AT(allresult.indices, i - 2, j) + 2; // Knearest is the index of K-nearest neighbors of i
+          W(j) = XtX.row(j).sum() / XtX.sum(); // normalize
+          int  Knearest;  // Knearest is the index of K-nearest neighbors of i
+          if (flag > j) // ignore the removed neighbor
+            Knearest = AT(allresult.indices, i - 2, j) + 2;
           else
             Knearest = AT(allresult.indices, i - 2, j + 1) + 2;
-          triplets.push_back(T(i, Knearest, -W(j)));
+          triplets.push_back(T(i, Knearest, -W(j))); // add to L(i, j)
           triplets.push_back(T(i, i, W(j))); // add to L(i, i)
         }
     }
@@ -616,7 +620,7 @@ void   Imagematting::getFinalAlpha()
   // compute the sparsity of matrix A
   cout << "The size of A: (" << A.rows() << ", " << A.cols() << ")\n";
   cout << "The non-zero numbers of matrix A: " << A.nonZeros() << endl;
-  cout << "The sparsity of A:" << A.nonZeros() / double(A.rows() * A.cols()) << endl;
+  cout << "The sparsity of A:" << A.nonZeros() / double(A.rows()) / double( A.cols()) << endl;
 
   VectorXd b = I * G;
 
@@ -644,9 +648,8 @@ void Imagematting::showMatte()
       for (int j = 0; j < width; j++)
         {
           int index = i * width + j + 2;
-          //if (Alpha[index] < 0) cout << Alpha[index] * 255 << "   ";
           udata[i * g_step + j] = int(abs(Alpha[index] * 255));
-          //udata[i * g_step + j] = int(preAlpha[i][j] * 255); // only use preAlpha
+             //udata[i * g_step + j] = uchar(int(preAlpha[i][j] * 255)); // only use preAlpha
         }
     }
 }
@@ -658,8 +661,6 @@ void Imagematting::save(char * filename)
 
 void   Imagematting::solveAlpha()
 {
-  clock_t start, finish;
-
   findKnearest(); // get K nearest backgrounds(indices + dists)
 
   //// read four mats in "Kdatas.xml"
