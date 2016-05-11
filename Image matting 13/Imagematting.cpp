@@ -340,7 +340,7 @@ void Imagematting::getPreAlpha()
   cout << "getPreAlpha ok " << endl;
 }
 
-void Imagematting::TEST(SpMat A)
+void Imagematting::TEST(SpMat A) // print all non-zero elements in Matrix A (just for test)
 {
   for (int k=0; k < A.outerSize(); ++k)
     {
@@ -363,31 +363,25 @@ void   Imagematting::getWeight1() // get data term W(i, F) & W(i, B)
       if (tri[x][y] == 0 || tri[x][y] == 1)
         {
           triplets.push_back(T(i, 0, -gamma * tri[x][y]));
-          //triplets.push_back(T(0, i, -gamma * tri[x][y])); // in F row
           triplets.push_back(T(i, 1, -gamma * (1 - tri[x][y])));
-          //triplets.push_back(T(1, i, -gamma * (1 - tri[x][y]))); // in B row
         }
       else
         {
           triplets.push_back(T(i, 0, -gamma * preAlpha[x][y]));
-          //triplets.push_back(T(0, i, -gamma * preAlpha[x][y])); // in F row
           triplets.push_back(T(i, 1, -gamma * (1 - preAlpha[x][y])));
-          //triplets.push_back(T(1, i, -gamma * (1 - preAlpha[x][y]))); // in B row
         }
     }
   for (int i = 2; i < N; i++)
     {
       triplets.push_back(T(i, i, gamma)); // add to L(i, i)
     }
-  //triplets.push_back(T(0, 0, gamma * (N - 2)));
-  //triplets.push_back(T(1, 1, gamma * (N - 2)));
 
   W1.setFromTriplets(triplets.begin(), triplets.end());
   W1.prune(0.0);
   cout << "getWeight1 ok" << endl;
 }
 
-void   Imagematting::getCovarianceMatrix(int x, int y) // x & y are the middle points in one 3*3 window (require: not the edge)
+void   Imagematting::getCovarianceMatrix(int x, int y) // (x, y) are the up-left points in one 3*3 window (require: not the edge)
 {
   int M = winSize * winSize; // the number of pixel in the window
   int n = 3; // channels
@@ -398,9 +392,9 @@ void   Imagematting::getCovarianceMatrix(int x, int y) // x & y are the middle p
     {
       for (int j = 0; j < winSize; j++)
         {
-          cvmSet(mat, i * winSize + j, 0, data[(x + i - 1) * step + (y + j - 1) * channels]);
-          cvmSet(mat, i * winSize + j, 1, data[(x + i - 1) * step + (y + j - 1) * channels + 1]);
-          cvmSet(mat, i * winSize + j, 2, data[(x + i - 1) * step + (y + j - 1) * channels + 2]);
+          cvmSet(mat, i * winSize + j, 0, data[(x + i) * step + (y + j) * channels]);
+          cvmSet(mat, i * winSize + j, 1, data[(x + i) * step + (y + j) * channels + 1]);
+          cvmSet(mat, i * winSize + j, 2, data[(x + i) * step + (y + j) * channels + 2]);
         }
     }
 
@@ -424,22 +418,23 @@ void   Imagematting::getWeight2() // get local smooth term Wlap(ij)
   // get Ci, Cj, uk, sigmaK of every 3*3 window
   std::vector<T> triplets;
   double w;
-  CvMat* reverseMat = cvCreateMat(winSize, winSize, CV_64FC1); // save the matrix which needs to be reverse
-  CvMat* IdenMat = cvCreateMat(winSize, winSize, CV_64FC1); // the identity mat
+  CvMat* reverseMat = cvCreateMat(3, 3, CV_64FC1); // save the matrix which needs to be reverse
+  CvMat* IdenMat = cvCreateMat(3, 3, CV_64FC1); // the identity mat
   CvMat* CiMat = cvCreateMat(1, 3, CV_64FC1); // for Ci
   CvMat* CjMat = cvCreateMat(1, 3, CV_64FC1); // for Cj
-  CvMat* stoMat = cvCreateMat(1, winSize, CV_64FC1); // store mat
-  CvMat* stoMat2 = cvCreateMat(1, winSize, CV_64FC1); // store mat
-  CvMat* stoMattr = cvCreateMat(winSize, 1, CV_64FC1); // store mat
+  CvMat* stoMat = cvCreateMat(1, 3, CV_64FC1); // store mat
+  CvMat* stoMat2 = cvCreateMat(1, 3, CV_64FC1); // store mat
+  CvMat* stoMattr = cvCreateMat(3, 1, CV_64FC1); // store mat
   CvMat* result = cvCreateMat(1, 1, CV_64FC1); // the result mat
   cvSetIdentity(IdenMat); //get I
-  for (int i = 0; i < height - 2; i++) //(i, j) is the up left point of every window
+  double wi = winSize * winSize;
+  for (int i = 0; i < height - winSize + 1; i++) //(i, j) is the up left point of every window
     {
-      for (int j = 0; j < width - 2; j++)
+      for (int j = 0; j < width - winSize + 1; j++)
         {
           // compute uk and sigmaK(update covarienceOfMat and avgOfMat)
-          getCovarianceMatrix(i + 1, j + 1); //send the center point
-          cvAddWeighted(covarienceOfMat, 1, IdenMat, REG / 9.0, 0, reverseMat); //covarienceOfMat + REG/9 * I
+          getCovarianceMatrix(i, j); //send the up-left point
+          cvAddWeighted(covarienceOfMat, 1, IdenMat, REG / wi, 0, reverseMat); //covarienceOfMat + REG/9 * I
           cvInvert(reverseMat, reverseMat, CV_SVD_SYM); //Mat = (Mat)-1
 
           //Wij = Wji
@@ -461,10 +456,10 @@ void   Imagematting::getWeight2() // get local smooth term Wlap(ij)
                   cvTranspose(stoMat2, stoMattr); // T(Cj - uk)const
                   cvMatMul(stoMat, stoMattr, result); // (Ci - uk) * (covarienceOfMat + REG/9 * I)-1 * T(Cj - uk)
                   w = 1 + cvmGet(result, 0, 0);
-                  triplets.push_back(T(x1 * width + y1 + 2, x2 * width + y2 + 2, -delta / 9.0 * w)); // Wij
-                  triplets.push_back(T(x2 * width + y2 + 2, x1 * width + y1 + 2, -delta / 9.0 * w)); // Wji
-                  triplets.push_back(T(x1 * width + y1 + 2, x1 * width + y1 + 2, delta / 9.0 * w)); // add to L(i, i)
-                  triplets.push_back(T(x2 * width + y2 + 2, x2 * width + y2 + 2, delta / 9.0 * w)); // add to L(i, i)
+                  triplets.push_back(T(x1 * width + y1 + 2, x2 * width + y2 + 2, -delta / wi * w)); // Wij
+                  triplets.push_back(T(x2 * width + y2 + 2, x1 * width + y1 + 2, -delta / wi * w)); // Wji
+                  triplets.push_back(T(x1 * width + y1 + 2, x1 * width + y1 + 2, delta / wi * w)); // add to L(i, i)
+                  triplets.push_back(T(x2 * width + y2 + 2, x2 * width + y2 + 2, delta / wi * w)); // add to L(i, i)
                 }
             }
 
@@ -486,10 +481,10 @@ void   Imagematting::getWeight2() // get local smooth term Wlap(ij)
                   cvTranspose(stoMat2, stoMattr); // T(Cj - uk)const
                   cvMatMul(stoMat, stoMattr, result); // (Ci - uk) * (covarienceOfMat + REG/9 * I)-1 * T(Cj - uk)
                   w = 1 + cvmGet(result, 0, 0);
-                  triplets.push_back(T(x1 * width + y1 + 2, x2 * width + y2 + 2, -delta / 9.0 * w)); // Wij
-                  triplets.push_back(T(x2 * width + y2 + 2, x1 * width + y1 + 2, -delta / 9.0 * w)); // Wji
-                  triplets.push_back(T(x1 * width + y1 + 2, x1 * width + y1 + 2, delta / 9.0 * w)); // add to L(i, i)
-                  triplets.push_back(T(x2 * width + y2 + 2, x2 * width + y2 + 2, delta / 9.0 * w)); // add to L(i, i)
+                  triplets.push_back(T(x1 * width + y1 + 2, x2 * width + y2 + 2, -delta / wi * w)); // Wij
+                  triplets.push_back(T(x2 * width + y2 + 2, x1 * width + y1 + 2, -delta / wi * w)); // Wji
+                  triplets.push_back(T(x1 * width + y1 + 2, x1 * width + y1 + 2, delta / wi * w)); // add to L(i, i)
+                  triplets.push_back(T(x2 * width + y2 + 2, x2 * width + y2 + 2, delta / wi * w)); // add to L(i, i)
                 }
             }
         }
@@ -586,6 +581,8 @@ void   Imagematting::getI()
 {
   // Iii = lambda_E if i belongs to S(S = f + b + u(confidence > 0.85))
   std::vector<T> triplets;
+  triplets.push_back(T(0, 0, lambda_E));
+  triplets.push_back(T(1, 1, lambda_E));
   for (int i = 2; i < N; i++) // let two virtue nodes be 0 (I00 = I11 = 0)
     {
       int x = (i - 2) / width;
@@ -617,6 +614,19 @@ void   Imagematting::getFinalAlpha()
   SpMat A = I + (L.transpose() * L);
   A.prune(0.0); // delete zero
 
+  // save A
+  fstream f("A.txt", ios::out);
+  if (!f) cout << "Error!" << endl;
+  for (int k = 0; k < A.outerSize(); ++k)
+    {
+        SpMat::InnerIterator it(A, k);
+        for (; it; ++it)
+        {
+          f << it.value() << "   ";
+        }
+    }
+  f.close();
+
   // compute the sparsity of matrix A
   cout << "The size of A: (" << A.rows() << ", " << A.cols() << ")\n";
   cout << "The non-zero numbers of matrix A: " << A.nonZeros() << endl;
@@ -642,6 +652,7 @@ void   Imagematting::getFinalAlpha()
 
 void Imagematting::showMatte()
 {
+  cout << Alpha[0]<<","<<Alpha[1]<<endl;
   uchar *udata = (uchar *)matte->imageData;
   for (int i = 0; i < height; i++)
     {
