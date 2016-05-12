@@ -17,11 +17,11 @@ using namespace Eigen;
 
 #define K          10 // the nearst K neighbors in RGBXY space
 #define winSize    3 // the size of a neighbor matrix
-#define sigma      0.1
-#define delta      0.1
-#define gamma      0.1
-#define REG        0.1
-#define CONFI      0.85
+#define sigma      0.1 // variance
+#define delta      0.1 // the coe of W2
+#define gamma      0.1 // the coe of W1
+#define REG        1e-4
+#define CONFI      0.999
 #define lambda_E   1000
 
 #define AT(mat, x, y) mat.at<int>(x, y)
@@ -56,8 +56,8 @@ class Imagematting
   Mat      fmat; // mat of foreground pixels
   Mat      umat; // mat of unknown pixels
   Mat      allmat; // mat of all pixels
-  int      *dB; // the min distance between C and B
-  int      *dF; // the min distance between C and F
+  int      *dB; // the min color distance between C and B
+  int      *dF; // the min color distance between C and F
   int      **tri; // 1 is foreground, 0 is background, 2 is unknown
   double   **preAlpha; // mat of predicted alpha (n * 1 matrix)
   double   **confidence; // confidence for every pixel

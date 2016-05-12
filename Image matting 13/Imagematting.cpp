@@ -68,7 +68,7 @@ void Imagematting::loadTrimap(char * filename)
       for (int j = 0; j < width; j++)
         {
           int gray = udata[i * g_step + j];
-          if (gray < 5) // c is a background     ////////////////////¿ÉÒÔÐÞ¸ÄÊ¹ÓÃmatµÄpush_back£¡£¡£¡£¡£¡
+          if (gray < 5) // c is a background
             {
               bsize++;
               tri[i][j] = 0;
@@ -118,7 +118,7 @@ void Imagematting::createMat()
 {
   uchar *udata = (uchar *)trimap->imageData;
 
-int bn = 0, fn = 0, un = 0, n = 0;
+  int bn = 0, fn = 0, un = 0, n = 0;
 
   for (int i = 0; i < height; i++)
     {
@@ -172,7 +172,7 @@ void Imagematting::findKnearest()// build 2 KD-trees
   tree3.knnSearch(allmat, allresult.indices, allresult.dists, K + 1); // search kd-tree, notice: result includes pixel which searchs for neighbors, thus need +1
 
   finish = clock();
-  cout << double(finish - start) / CLOCKS_PER_SEC << endl;
+  // cout << double(finish - start) / CLOCKS_PER_SEC << endl;
 
   // FileStorage fs("K2.xml", FileStorage::WRITE); // save the data
   // fs << "bindices" << bresult.indices;
@@ -224,7 +224,6 @@ double Imagematting::getRd(int c, int f, int b) //f is the fth-nearest pixel of 
                        (((BC(fmat, findex) - BC(bmat, bindex)) * (BC(fmat, findex) - BC(bmat, bindex)) +
                          (GC(fmat, findex) - GC(bmat, bindex)) * (GC(fmat, findex) - GC(bmat, bindex)) +
                          (RC(fmat, findex) - RC(bmat, bindex)) * (RC(fmat, findex) - RC(bmat, bindex))) + 0.0000001));
-  //return result / 255.0;  //?????????????????????
   return result;
 }
 
@@ -260,18 +259,16 @@ double Imagematting::getW(int c, int fb, bool flag) // flag == 1, f; flag == 0, 
   if (flag == 0) // b
     {
       int index = AT(bresult.indices, c, fb);
-      w = exp(-((BC(umat, c) - BC(bmat, index)) * (BC(umat, c) - BC(bmat, index)) +
+      w = 1 - exp(-((BC(umat, c) - BC(bmat, index)) * (BC(umat, c) - BC(bmat, index)) +
                 (GC(umat, c) - GC(bmat, index)) * (GC(umat, c) - GC(bmat, index)) +
                 (RC(umat, c) - RC(bmat, index)) * (RC(umat, c) - RC(bmat, index))) / (dB[c] + 0.0000001));
-      w = 1 - w;
     }
   else // f
     {
       int index = AT(fresult.indices, c, fb);
-      w = exp(-((BC(umat, c) - BC(fmat, index)) * (BC(umat, c) - BC(fmat, index)) +
+      w = 1 - exp(-((BC(umat, c) - BC(fmat, index)) * (BC(umat, c) - BC(fmat, index)) +
                 (GC(umat, c) - GC(fmat, index)) * (GC(umat, c) - GC(fmat, index)) +
                 (RC(umat, c) - RC(fmat, index)) * (RC(umat, c) - RC(fmat, index))) / (dF[c] + 0.0000001));
-      w = 1 - w;
     }
   return w;
 }
@@ -279,13 +276,14 @@ double Imagematting::getW(int c, int fb, bool flag) // flag == 1, f; flag == 0, 
 double Imagematting::getConfidence(int c, int f, int b)  //f is the fth-nearest foreground pixel of C, b is the bth-nearest background pixel of C
 {
   double confi;
-  confi = exp(-(getRd(c, f, b) * getRd(c, f, b) * getW(c, f, 1) * getW(c, b, 0)) / (sigma * sigma)); //////////////getW ²¿·ÖÓÐÖØ¸´¿É¼ò»¯
+  confi = exp(-(getRd(c, f, b) * getRd(c, f, b) * getW(c, f, 1) * getW(c, b, 0)) / (sigma * sigma)); //////////////getW ²¿·ÖÓÐÖØ¸´¿É¼ò»
   return confi;
 }
 
 void Imagematting::getPreAlpha()
 {
   getD();
+
   // calculate confidence of every unknown pixel
   for (int i = 0; i < usize; i++)
     {
@@ -346,8 +344,6 @@ void Imagematting::TEST(SpMat A) // print all non-zero elements in Matrix A (jus
     {
       for (SparseMatrix<double>::InnerIterator it(A,k); it; ++it)
         {
-          //  std::cout << "(" << it.row() << ","; // row index
-          //    std::cout << it.col() << ")\t"; // col index (here it is equal to k)
           cout<< it.value() << "   ";
         }
     }
@@ -364,11 +360,21 @@ void   Imagematting::getWeight1() // get data term W(i, F) & W(i, B)
         {
           triplets.push_back(T(i, 0, -gamma * tri[x][y]));
           triplets.push_back(T(i, 1, -gamma * (1 - tri[x][y])));
+
+          // triplets.push_back(T(0, i, -gamma * tri[x][y]));
+          // triplets.push_back(T(1, i, -gamma * (1 - tri[x][y])));
+          // triplets.push_back(T(0, 0, gamma * tri[x][y]));
+          // triplets.push_back(T(1, 1, gamma * (1 - tri[x][y])));
         }
       else
         {
           triplets.push_back(T(i, 0, -gamma * preAlpha[x][y]));
           triplets.push_back(T(i, 1, -gamma * (1 - preAlpha[x][y])));
+
+          // triplets.push_back(T(0, i, -gamma * preAlpha[x][y]));
+          // triplets.push_back(T(1, i, -gamma * (1 - preAlpha[x][y])));
+          // triplets.push_back(T(0, 0, gamma * preAlpha[x][y]));
+          // triplets.push_back(T(1, 1, gamma * (1 - preAlpha[x][y])));
         }
     }
   for (int i = 2; i < N; i++)
@@ -565,25 +571,30 @@ void   Imagematting::getWeight3() // get unlocal smooth term Wlle(ij), use LLE
 void   Imagematting::getG()
 {
   // Gi is set to 1 if i belongs to foreground and 0 otherwise
+  int highconfi = 0; // number of confidence > CONFI
   for (int i = 2; i < N; i++) // 0, 1 are two virtue nodes
     {
       int x = (i - 2) / width;
       int y = (i - 2) - x * width;
       if (tri[x][y] == 1)
         G(i) = 1;
-      else if (confidence[x][y] > 0.85)
-        G(i) = preAlpha[x][y];
+      else if (confidence[x][y] > CONFI)
+        {
+          G(i) = preAlpha[x][y];
+          highconfi++;
+        }
     }
+  cout << "confi > CONFI: " << highconfi << "   usize: " << usize << endl;
   cout << "getG ok" << endl;
 }
 
 void   Imagematting::getI()
 {
-  // Iii = lambda_E if i belongs to S(S = f + b + u(confidence > 0.85))
+  // Iii = lambda_E if i belongs to S(S = f + b + u(confidence > CONFI))
   std::vector<T> triplets;
-  triplets.push_back(T(0, 0, lambda_E));
+  triplets.push_back(T(0, 0, lambda_E));  // let two virtue nodes be lambda_E (I00 = I11 = lambda_E)
   triplets.push_back(T(1, 1, lambda_E));
-  for (int i = 2; i < N; i++) // let two virtue nodes be 0 (I00 = I11 = 0)
+  for (int i = 2; i < N; i++)
     {
       int x = (i - 2) / width;
       int y = (i - 2) - x * width;
@@ -615,17 +626,17 @@ void   Imagematting::getFinalAlpha()
   A.prune(0.0); // delete zero
 
   // save A
-  fstream f("A.txt", ios::out);
-  if (!f) cout << "Error!" << endl;
-  for (int k = 0; k < A.outerSize(); ++k)
-    {
-        SpMat::InnerIterator it(A, k);
-        for (; it; ++it)
-        {
-          f << it.value() << "   ";
-        }
-    }
-  f.close();
+  // fstream f("A.txt", ios::out);
+  // if (!f) cout << "Error!" << endl;
+  // for (int k = 0; k < A.outerSize(); ++k)
+  //   {
+  //       SpMat::InnerIterator it(A, k);
+  //       for (; it; ++it)
+  //       {
+  //         f << it.value() << "   ";
+  //       }
+  //   }
+  // f.close();
 
   // compute the sparsity of matrix A
   cout << "The size of A: (" << A.rows() << ", " << A.cols() << ")\n";
@@ -652,15 +663,15 @@ void   Imagematting::getFinalAlpha()
 
 void Imagematting::showMatte()
 {
-  cout << Alpha[0]<<","<<Alpha[1]<<endl;
+  //  cout << Alpha[0] << "," << Alpha[1] << endl; // show computed alpha of two virtue nodes
   uchar *udata = (uchar *)matte->imageData;
   for (int i = 0; i < height; i++)
     {
       for (int j = 0; j < width; j++)
         {
           int index = i * width + j + 2;
-          udata[i * g_step + j] = int(abs(Alpha[index] * 255));
-             //udata[i * g_step + j] = uchar(int(preAlpha[i][j] * 255)); // only use preAlpha
+          udata[i * g_step + j] = max(min(int(Alpha[index] * 255), 255), 0); // notice: abs is not right
+          //   udata[i * g_step + j] = uchar(int(preAlpha[i][j] * 255)); // only use preAlpha
         }
     }
 }
