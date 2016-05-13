@@ -41,6 +41,7 @@ class Imagematting
   IplImage *img; // the original image
   IplImage *trimap; // the original trimap
   IplImage *matte; // the result image
+  IplImage *dilateimg; // after dilation
   int      height;
   int      width;
   int      step; // widthstep of image
@@ -52,6 +53,7 @@ class Imagematting
   int      bsize; // size of background pixels
   int      fsize; // size of foreground pixels
   int      usize; // size of unknown pixels
+  int      allsize; // siez of dilating pixels
   Mat      bmat; // mat of background pixels
   Mat      fmat; // mat of foreground pixels
   Mat      umat; // mat of unknown pixels
@@ -59,6 +61,7 @@ class Imagematting
   int      *dB; // the min color distance between C and B
   int      *dF; // the min color distance between C and F
   int      **tri; // 1 is foreground, 0 is background, 2 is unknown
+  //  int      **xy_index; // (x,y) get index in allmat
   double   **preAlpha; // mat of predicted alpha (n * 1 matrix)
   double   **confidence; // confidence for every pixel
 
@@ -76,6 +79,7 @@ class Imagematting
   VectorXd G;  // G is a Vector
   VectorXd Alpha; // the final alpha
 
+  void     dilate(IplImage *binaryimg);
   void     addInMat(Mat &mat, int n, int i, int j, int b, int g, int r); // add a RGBXY parameter in allmat
   void     addInMat(Mat &mat, int n, int x, int y); // add a XY parameter in  mat
   void     createMat(); // create b-, f-, u-, allmat
@@ -91,7 +95,9 @@ class Imagematting
   void     getWeight3(); // get unlocal smooth term Wlle(ij)
 
   void     getCovarianceMatrix(int i, int j); // get covariance matrix of a 3*3 window, x & y are the middle points in one 3*3 window
-  void     getCiCj(CvMat *mat, int i, int j); // get the (i,j)-th of mat (RGBXY)
+  void     getCiCj(CvMat *mat, int i, int j); // get the (i,j)-th RGB of data in mat
+
+  int      getBigIndex(int i); // i is index in allmat, return index in Alpha
 
   void     getG(); // get G
   void     getI(); // get I
