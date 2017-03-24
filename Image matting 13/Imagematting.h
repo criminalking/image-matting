@@ -21,8 +21,9 @@ using namespace Eigen;
 #define delta      0.1 // the coe of W2
 #define gamma      0.1 // the coe of W1
 #define REG        1e-4
-#define CONFI      0.999
+#define CONFI      0.18
 #define lambda_E   1000
+#define di_time    5 // dilation times
 
 #define AT(mat, x, y) mat.at<int>(x, y)
 
@@ -106,6 +107,14 @@ class Imagematting
   int      BC(Mat &mat, int index);
   int      GC(Mat &mat, int index);
   int      RC(Mat &mat, int index);
+
+  double   getEc(int c, int f, int b);
+  double   getEs(int c, int fb, bool flag);
+  void     getDspace();
+
+  int      *dsB; // the min spacial distance between C and B
+  int      *dsF; // the min spacial distance between C and F
+
 
  public:
   Imagematting();

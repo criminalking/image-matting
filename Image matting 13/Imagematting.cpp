@@ -105,6 +105,7 @@ void Imagematting::loadTrimap(char * filename)
   dilate(binaryimg); // dilate the binaryimg
   cvReleaseImage(&binaryimg);
   allsize = cvCountNonZero(dilateimg);
+  cout << allsize << endl;
 
   bmat = Mat::zeros(bsize, 2, CV_32FC1);
   fmat = Mat::zeros(fsize, 2, CV_32FC1);
@@ -116,7 +117,7 @@ void Imagematting::loadTrimap(char * filename)
 
 void Imagematting::dilate(IplImage *binaryimg)
 {
-  cvDilate(binaryimg, dilateimg, 0, 3); // dilate 3 times
+  cvDilate(binaryimg, dilateimg, 0, di_time); // dilate di_time  times
 }
 
 void Imagematting::addInMat(Mat &mat, int n, int i, int j, int b, int g, int r)
@@ -295,16 +296,73 @@ double Imagematting::getW(int c, int fb, bool flag) // flag == 1, f; flag == 0, 
   return w;
 }
 
+double Imagematting::getEc(int c, int f, int b) //f is the fth-nearest pixel of C, b is the bth-nearest pixel of C
+{
+  double alpha = geteveryAlpha(c, f, b);
+  int findex = AT(fresult.indices, c, f);
+  int bindex = AT(bresult.indices, c, b);
+
+  double result = sqrt(((BC(umat, c) - alpha * BC(fmat, findex) - (1 - alpha) * BC(bmat, bindex)) * (BC(umat, c) - alpha * BC(fmat, findex) - (1 - alpha) * BC(bmat, bindex)) +
+                        (GC(umat, c) - alpha * GC(fmat, findex) - (1 - alpha) * GC(bmat, bindex)) * (GC(umat, c) - alpha * GC(fmat, findex) - (1 - alpha) * GC(bmat, bindex)) +
+                        (RC(umat, c) - alpha * RC(fmat, findex) - (1 - alpha) * RC(bmat, bindex)) * (RC(umat, c) - alpha * RC(fmat, findex) - (1 - alpha) * RC(bmat, bindex))));
+  return result;
+}
+
+double Imagematting::getEs(int c, int fb, bool flag) // flag == 1, f; flag == 0, b; fb is the fbth-nearest fore- or background pixel of C
+{
+  double w;
+  if (flag == 1) // f
+    {
+      int index = AT(fresult.indices, c, fb);
+      w = sqrt((AT(umat, c, 0) - AT(fmat, index, 0)) * (AT(umat, c, 0) - AT(fmat, index, 0)) +
+                (AT(umat, c, 1) - AT(fmat, index, 1)) * (AT(umat, c, 1) - AT(fmat, index, 1)) / (dsF[c] + 0.0000001));
+    }
+  else // b
+    {
+      int index = AT(bresult.indices, c, fb);
+      w = sqrt((AT(umat, c, 0) - AT(bmat, index, 0)) * (AT(umat, c, 0) - AT(bmat, index, 0)) +
+                (AT(umat, c, 1) - AT(bmat, index, 1)) * (AT(umat, c, 1) - AT(bmat, index, 1)) / (dsB[c] + 0.0000001));
+    }
+  return w;
+}
+
+void Imagematting::getDspace() // not sqrt
+{
+  // get db, df of every pixel
+  dsB = new int[usize];
+  dsF = new int[usize];
+  double min1 = 0, min2 = 0;
+  for (int i = 0; i < usize; i++)
+    {
+      // calculate d2
+      dsB[i] = height * height + width * width; // need to more than height^2 + width^2
+      dsF[i] = height * height + width * width;
+      for (int k = 0; k < K; k++)
+        {
+          int bindex = AT(bresult.indices, i, k); // get the nearest background of C
+          min1 = (AT(umat, i, 0) - AT(bmat, bindex, 0)) * (AT(umat, i, 0) - AT(bmat, bindex, 0)) + (AT(umat, i, 1) - AT(bmat, bindex, 1)) * (AT(umat, i, 1) - AT(bmat, bindex, 1));
+          if (min1 < dsB[i]) dsB[i] = min1;
+
+          int findex = AT(fresult.indices, i, k); // get the nearest foreground of C
+          min2 = (AT(umat, i, 0) - AT(fmat, findex, 0)) * (AT(umat, i, 0) - AT(fmat, findex, 0)) + (AT(umat, i, 1) - AT(fmat, findex, 1)) * (AT(umat, i, 1) - AT(fmat, findex, 1));
+          if (min2 < dsF[i]) dsF[i] = min2;
+        }
+    }
+  cout << "getD ok " << endl;
+}
+
 double Imagematting::getConfidence(int c, int f, int b)  //f is the fth-nearest foreground pixel of C, b is the bth-nearest background pixel of C
 {
   double confi;
-  confi = exp(-(getRd(c, f, b) * getRd(c, f, b) * getW(c, f, 1) * getW(c, b, 0)) / (sigma * sigma));
+  //confi = exp(-(getRd(c, f, b) * getRd(c, f, b) * getW(c, f, 1) * getW(c, b, 0)) / (sigma * sigma));
+  confi = 1.0 / (getEc(c, f, b) + getEs(c, f, 1) + getEs(c, b, 0));
   return confi;
 }
 
 void Imagematting::getPreAlpha()
 {
-  getD();
+  //getD();
+  getDspace();
 
   // calculate confidence of every unknown pixel
   for (int i = 0; i < usize; i++)
@@ -474,7 +532,7 @@ void   Imagematting::getWeight2() // get local smooth term Wlap(ij)
                   int y2 = l2 + 1 + j;
                   int binary1 = ddata[x1 * g_step + y1];
                   int binary2 = ddata[x2 * g_step + y2];
-                  if (binary1 != 0 && binary2 != 0) // binary1 and binary 2
+                  if (binary1 != 0 || binary2 != 0) // binary1 and binary 2
                     {
                       getCiCj(CiMat, x1, y1); // store RGB of (x1, y1)-th pixel in CiMat
                       getCiCj(CjMat, x2, y2);
@@ -485,8 +543,8 @@ void   Imagematting::getWeight2() // get local smooth term Wlap(ij)
                       cvMatMul(stoMat, stoMattr, result); // (Ci - uk) * (covarienceOfMat + REG/9 * I)-1 * T(Cj - uk)
                       w = 1 + cvmGet(result, 0, 0);
                       triplets.push_back(T(x1 * width + y1 + 2, x2 * width + y2 + 2, -delta / wi * w)); // Wij
-                      triplets.push_back(T(x2 * width + y2 + 2, x1 * width + y1 + 2, -delta / wi * w)); // Wji
                       triplets.push_back(T(x1 * width + y1 + 2, x1 * width + y1 + 2, delta / wi * w)); // add to L(i, i)
+                      triplets.push_back(T(x2 * width + y2 + 2, x1 * width + y1 + 2, -delta / wi * w)); // Wji
                       triplets.push_back(T(x2 * width + y2 + 2, x2 * width + y2 + 2, delta / wi * w)); // add to L(i, i)
                     }
                 }
@@ -515,8 +573,8 @@ void   Imagematting::getWeight2() // get local smooth term Wlap(ij)
                       cvMatMul(stoMat, stoMattr, result); // (Ci - uk) * (covarienceOfMat + REG/9 * I)-1 * T(Cj - uk)
                       w = 1 + cvmGet(result, 0, 0);
                       triplets.push_back(T(x1 * width + y1 + 2, x2 * width + y2 + 2, -delta / wi * w)); // Wij
-                      triplets.push_back(T(x2 * width + y2 + 2, x1 * width + y1 + 2, -delta / wi * w)); // Wji
                       triplets.push_back(T(x1 * width + y1 + 2, x1 * width + y1 + 2, delta / wi * w)); // add to L(i, i)
+                      triplets.push_back(T(x2 * width + y2 + 2, x1 * width + y1 + 2, -delta / wi * w)); // Wji
                       triplets.push_back(T(x2 * width + y2 + 2, x2 * width + y2 + 2, delta / wi * w)); // add to L(i, i)
                     }
                 }
@@ -539,7 +597,7 @@ void   Imagematting::getWeight2() // get local smooth term Wlap(ij)
 void   Imagematting::getWeight3() // get unlocal smooth term Wlle(ij), use LLE
 {
   std::vector<T> triplets;
-  double del = 0.1 * 0.1 / K; // add a very small number to eigenvalue of XtX in order to insurance invertibility of XtX
+  double del = 0.01 * 0.01 / K; // add a very small number to eigenvalue of XtX in order to insurance invertibility of XtX
 
   for (int i = 0; i < allsize; i++)
     {
@@ -631,8 +689,8 @@ void   Imagematting::getI()
 {
   // Iii = lambda_E if i belongs to S(S = f + b + u(confidence > CONFI))
   std::vector<T> triplets;
-  //  triplets.push_back(T(0, 0, lambda_E));  // let two virtue nodes be lambda_E (I00 = I11 = lambda_E)
-  // triplets.push_back(T(1, 1, lambda_E));
+  //triplets.push_back(T(0, 0, lambda_E));  // let two virtue nodes be lambda_E (I00 = I11 = lambda_E)
+  //triplets.push_back(T(1, 1, lambda_E));
   for (int i = 0; i < allsize; i++)
     {
       //int x = i / width;
@@ -664,7 +722,7 @@ void   Imagematting::getFinalAlpha()
   getL();
   // (I + T(L) * L) * alpha = I * G
   SpMat A = I + (L.transpose() * L);
-  A.prune(0.0); // delete zero
+  A.prune(0.0); // delete zero elements
 
   // save A
   // fstream f("A.txt", ios::out);
@@ -712,13 +770,13 @@ void Imagematting::showMatte()
         {
           if (tri[i][j] == 0) // background
             udata[i * g_step + j] = 0;
-          else if (tri[i][j] == 1)
+          else if (tri[i][j] == 1) // foreground
             udata[i * g_step + j] = 255;
-          else
+          else // unknown area
             {
               int index = i * width + j + 2;
               udata[i * g_step + j] = max(min(int(Alpha[index] * 255), 255), 0); // notice: abs is not right
-              // udata[i * g_step + j] = uchar(int(preAlpha[i][j] * 255)); // only use preAlpha
+              //udata[i * g_step + j] = max(min(int(confidence[i][j] * 255 * 5), 255), 0); // use preAlpha
             }
         }
     }

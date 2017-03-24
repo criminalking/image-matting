@@ -1,12 +1,37 @@
-Image Matting
-================
+#Image Matting
 
-Pre-Requirements
-----------------
+This is a c++ implementation of the paper *Image Matting with Local and Nonlocal Smooth Priors* by Xiaowu Chen et al.
 
-C++ + VS2013 + OpenCV2.4.9 + Eigen
+## What is Image Matting?
 
+Mathematically, the image *I* is a linear combination of *F* and *B* as the following: $C=F\alpha +B(1-\alpha)$. Here, the alpha matte $\alpha$ defines the opacity of each pixel and its value lies in [0,1]. Our goal is to estimate this $\alpha$. In this paper, sampling and affinity matting are combined to solve this problem. Sampling-Based Matting estimates the alpha matte, foreground and background color of a pixel simultaneously. Affinity-Based Matting solves the alpha matte independent of the foreground and background colors which consists of local smooth prior and nonlocal smooth prior.
 
-Contents
-----------------
-Image Matting with Local and Nonlocal Smooth Priors
+## Pre-requisite
+
+* [opencv 2.4.13](http://opencv.org/)
+* [Eigen](http://eigen.tuxfamily.org/index.php?title=Main_Page)
+
+## Usage
+
+build: make build
+run: ./main input_image_in_pic input_trimap_in_pic output_image_in_results
+
+## Configuration
+
+* System: Mac OS X
+* Programming language: c++
+
+## Results
+
+![original image](/Image matting 13/pic/net.png)
+![trimap image](/Image matting 13/pic/nettri.png)
+![result image](/Image matting 13/results/result_net.png)
+
+## Future Work
+
+* Actually, many results have artifacts(worse than this paper's results), such as ![artifacts](/Image matting 13/results/result_plant.jpg). Should think about the parameters or change a new implementation in some details.
+
+## Thanks
+
+* Date: 5-2016
+* Author: criminalking
