@@ -10,9 +10,9 @@ int main(int argc, char **argv)
     {
       clock_t start, finish;
       start = clock();
-      string input_image = string("pic/") + argv[1];
-      string input_trimap = string("pic/") + argv[2];
-      string output_image = string("results/") + argv[3];
+      string input_image = string("../pic/") + argv[1];
+      string input_trimap = string("../pic/") + argv[2];
+      string output_image = string("../results/") + argv[3];
       sm.loadImage(const_cast<char*>(input_image.c_str()));
       sm.loadTrimap(const_cast<char*>(input_trimap.c_str()));
       sm.solveAlpha();

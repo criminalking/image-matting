@@ -251,5 +251,4 @@ paket-files/
 .idea/
 *.sln.iml
 
-test pictures for Imagematting/**/**/*.png
-*.png
+test_pictures_for_imagematting/*
