@@ -18,7 +18,7 @@ Mathematically, the image *I* is a linear combination of *F* and *B* as the foll
 
 ## Configuration
 
-* System: Mac OS X
+* System: Mac OS X / Windows VS2012
 * Programming language: c++
 
 ## Results
